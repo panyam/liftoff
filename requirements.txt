@@ -1,0 +1,7 @@
+boto3
+ipython 
+ipdb
+pytest
+awscli
+pytest-mock
+fabric
