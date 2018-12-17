@@ -5,7 +5,7 @@ import boto3
 from ipdb import set_trace
 from pprint import pprint
 
-from liftoff.utils import fullpath, ensure_pdir
+from liftoff.utils import fullpath, ensure_pdir, ensure_object
 ec2 = boto3.client('ec2')
 ec2r = boto3.resource('ec2')
 
@@ -27,28 +27,34 @@ ec2r = boto3.resource('ec2')
 def get_instances(configs):
     # Get all instances running this product
     reservations = ec2.describe_instances()['Reservations']
-    instances =  functools.reduce(lambda x,y:x + y, [r['Instances'] for r in reservations], [])
+    instances = functools.reduce(lambda x,y:x + y, [r['Instances'] for r in reservations], [])
     out = []
     for instance in instances:
-        tags = instance.get('Tags',[])
-        tagsdict = dict([(tag['Key'],tag['Value']) for tag in tags])
-        instance['Tags'] = tagsdict
-        if tagsdict.get('Product', None) == configs.product.name and \
-                tagsdict.get('Version', None) == configs.product.version:
-            out.append(instance)
-    return out
+        # Check state
+        instance = ensure_object(instance)
+        if instance.State.Name == "terminated": continue
+    
+        # Check tags
+        instance['Tags'] = dict([(tag['Key'],tag['Value']) for tag in instance.Tags])
+        if instance.Tags.Product != configs.product.name: continue
+        if instance.Tags.Version != configs.product.version: continue
+
+        out.append(instance._values)
+    return ensure_object(out)
 
 def create_raw_instance(configs, dry_run = True):
     """ Create a clean-slate/raw instance on which the product and all its dependancies will 
     be deployed before it can be snapshotted for easy installation/launching.
     """
+    awsenv = configs.env.aws
     key_pair = create_key_pair(configs, False)
     instance = ec2r.create_instances(
-                ImageId = configs.environ.ami,
-                InstanceType = configs.environ.instance_type,
+                ImageId = awsenv.ami,
+                InstanceType = awsenv.instance_type,
                 MinCount = 1, MaxCount = 1,
-                KeyName = configs.environ.key_name,
+                KeyName = awsenv.key_name,
                 DryRun = dry_run,
+                SecurityGroups = [awsenv.security_group.name],
                 TagSpecifications = [
                     {
                         'ResourceType': 'instance', 
@@ -75,14 +81,18 @@ def launch_product(product):
     """ Launches the product by bringing up the required instances as described by the product's manifest. """
     pass
 
+def ssh(instanceid):
+    pass
+
 def create_key_pair(configs, force = False):
     """ Creates a key pair for a given product and stores it locally.  
     If it already exists 'force' option can be used to recreate it.
     """
 
     # Ensure parent folder exists since we are writing to it
-    key_name = configs.environ.key_name
-    key_file_path = fullpath(configs.environ.key_file)
+    awsenv = configs.env.aws
+    key_name = awsenv.key_name
+    key_file_path = fullpath(awsenv.key_file)
     ensure_pdir(key_file_path)
 
     keypairs = ec2.describe_key_pairs()['KeyPairs']
@@ -110,3 +120,51 @@ def create_key_pair(configs, force = False):
     key_file.write(KeyPairOut)
     os.chmod(key_file_path, 0o400)
     return KeyPairOut
+
+def ensure_security_group(configs):
+    awsenv = configs.env.aws
+    sgs = ec2.describe_security_groups()
+    for sg in sgs['SecurityGroups']:
+        if sg['GroupName'] == awsenv.security_group.name:
+            return sg
+    sg = ec2.create_security_group(
+                GroupName = awsenv.security_group.name,
+                Description = "Default security group for launching VMs.")
+
+    ec2.authorize_security_group_ingress(
+             GroupId = sg['GroupId'], 
+             IpPermissions = [
+                 {
+                    'FromPort': 22, 'IpProtocol': 'tcp',
+                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
+                    'Ipv6Ranges': [],
+                    'PrefixListIds': [],
+                    'ToPort': 22,
+                    'UserIdGroupPairs': []
+                },
+                {
+                    'FromPort': 80, 'IpProtocol': 'tcp',
+                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
+                    'Ipv6Ranges': [],
+                    'PrefixListIds': [],
+                    'ToPort': 80,
+                    'UserIdGroupPairs': []
+                },
+                {
+                    'FromPort': 443, 'IpProtocol': 'tcp',
+                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
+                    'Ipv6Ranges': [],
+                    'PrefixListIds': [],
+                    'ToPort': 443,
+                    'UserIdGroupPairs': []
+                },
+                {
+                    'FromPort': 0, 'IpProtocol': 'icmp',
+                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
+                    'Ipv6Ranges': [],
+                    'PrefixListIds': [],
+                    'ToPort': 0,
+                    'UserIdGroupPairs': []
+                }
+            ])
+

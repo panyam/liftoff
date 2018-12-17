@@ -5,3 +5,4 @@ pytest
 awscli
 pytest-mock
 fabric
+ansible
