@@ -5,26 +5,12 @@ import boto3
 from ipdb import set_trace
 from pprint import pprint
 
-from liftoff.utils import fullpath, ensure_pdir, ensure_object
+from liftoff.utils import fullpath, ensure_pdir, ensure_object, remember_cwd
 ec2 = boto3.client('ec2')
 ec2r = boto3.resource('ec2')
 
-# What are the goals of our "installer".
-# We have two kinds of users - creators of products and users of products.
-# 
-#   1. For creators of products - we want to setup different kind of "setups", eg:
-#       a. N db resources
-#       b. M app resources
-#       c. X type Y resources and so on.
-#       d. Optionally for each resource group have some kind of DNS/logical name/LB support for it
-#
-#   2. For users of the product, we just want this to be "deployed" and used per the u
-#       resource spec as specified.  This would result in:
-#       a. The resource groups as specified by dev.
-#       b. A way to access this service (either internally or externally)
-
 #####  Developer API
-def get_instances(configs):
+def get_instances(appliance):
     # Get all instances running this product
     reservations = ec2.describe_instances()['Reservations']
     instances = functools.reduce(lambda x,y:x + y, [r['Instances'] for r in reservations], [])
@@ -36,18 +22,19 @@ def get_instances(configs):
     
         # Check tags
         instance['Tags'] = dict([(tag['Key'],tag['Value']) for tag in instance.Tags])
-        if instance.Tags.Product != configs.product.name: continue
-        if instance.Tags.Version != configs.product.version: continue
+        if instance.Tags.Product != appliance.name: continue
+        if instance.Tags.Version != appliance.version: continue
 
         out.append(instance._values)
     return ensure_object(out)
 
-def create_raw_instance(configs, dry_run = True):
+def provision_resource(resname, appliance, dry_run = True):
     """ Create a clean-slate/raw instance on which the product and all its dependancies will 
     be deployed before it can be snapshotted for easy installation/launching.
     """
-    awsenv = configs.env.aws
-    key_pair = create_key_pair(configs, False)
+    awsenv = appliance.resources[resname].providers.aws
+    key_pair = create_key_pair(awsenv.key_name, awsenv.key_file, False)
+    ensure_security_groups(resname, appliance)
     instance = ec2r.create_instances(
                 ImageId = awsenv.ami,
                 InstanceType = awsenv.instance_type,
@@ -59,22 +46,33 @@ def create_raw_instance(configs, dry_run = True):
                     {
                         'ResourceType': 'instance', 
                         'Tags': [
-                            { 'Key': 'Product', 'Value': configs.product.name },
-                            { 'Key': 'Version', 'Value': configs.product.version },
+                            { 'Key': 'Product', 'Value': appliance.name },
+                            { 'Key': 'Version', 'Value': appliance.version },
                         ]
                     }
                 ])
     return instance
 
-def bootstram_instance(configs, instance):
+def bootstram_resource(resname, appliance, instance):
     """ Given a clean-slate instance, bootstraps the product by installing it and all its dependencies
     so this instance can be snapshotted into an AMI.
     """
-    pass
+    resconfig = appliance.resources[resname]
 
-def make_snapshot(configs, instance):
-    """ After a bootstrap is complete, the instance is snapshotted for easy installation. """
-    pass
+    with remember_cwd():
+        os.chdir(os.path.dirname(appliance.config_path))
+        contents = open(resconfig.bootstrap_script).read()
+        pkgcode = compile(contents, resconfig.bootstrap_script, "exec")
+        pkgdata = {}
+        exec(pkgcode, pkgdata)
+        runner = pkgdata['run']
+
+        awsenv = resconfig.providers.aws
+        # Connect to the instance
+        from fabric import Connection
+        conn = Connection("%s@%s" % (awsenv.ssh_user, instance.PublicDnsName))
+        runner(resname, appliance, conn)
+        return conn
 
 #####  Product Deployer API
 def launch_product(product):
@@ -84,15 +82,13 @@ def launch_product(product):
 def ssh(instanceid):
     pass
 
-def create_key_pair(configs, force = False):
+def create_key_pair(key_name, key_file, force = False):
     """ Creates a key pair for a given product and stores it locally.  
     If it already exists 'force' option can be used to recreate it.
     """
 
     # Ensure parent folder exists since we are writing to it
-    awsenv = configs.env.aws
-    key_name = awsenv.key_name
-    key_file_path = fullpath(awsenv.key_file)
+    key_file_path = fullpath(key_file)
     ensure_pdir(key_file_path)
 
     keypairs = ec2.describe_key_pairs()['KeyPairs']
@@ -121,8 +117,8 @@ def create_key_pair(configs, force = False):
     os.chmod(key_file_path, 0o400)
     return KeyPairOut
 
-def ensure_security_group(configs):
-    awsenv = configs.env.aws
+def ensure_security_groups(resname, appliance):
+    awsenv = appliance.resources[resname].providers.aws
     sgs = ec2.describe_security_groups()
     for sg in sgs['SecurityGroups']:
         if sg['GroupName'] == awsenv.security_group.name:

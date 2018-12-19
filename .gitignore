@@ -1,6 +1,7 @@
 dist
 .cache
 gen
+.DS_Store
 .pytest_cache
 *.swp
 *.pyc

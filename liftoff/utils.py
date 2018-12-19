@@ -1,5 +1,25 @@
 
 import os
+import functools
+import contextlib
+
+def preserve_cwd(function):
+    @functools.wraps(function)
+    def decorator(*args, **kwargs):
+        cwd = os.getcwd()
+        try:
+            return function(*args, **kwargs)
+        finally:
+            os.chdir(cwd)
+    return decorator
+
+@contextlib.contextmanager
+def remember_cwd():
+    curdir = os.getcwd()
+    try:
+        yield
+    finally:
+        os.chdir(curdir)
 
 def fullpath(path):
     if path[0] == '~' and not os.path.exists(path):
