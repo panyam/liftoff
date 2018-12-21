@@ -6,6 +6,7 @@ from ipdb import set_trace
 from pprint import pprint
 
 from liftoff.utils import fullpath, ensure_pdir, ensure_object, remember_cwd
+rds = boto3.client('rds')
 ec2 = boto3.client('ec2')
 ec2r = boto3.resource('ec2')
 
@@ -28,32 +29,66 @@ def get_instances(appliance):
         out.append(instance._values)
     return ensure_object(out)
 
-def provision_resource(resname, appliance, dry_run = True):
-    """ Create a clean-slate/raw instance on which the product and all its dependancies will 
-    be deployed before it can be snapshotted for easy installation/launching.
+#####  Product Deployer API
+def create_key_pair(KeyName, KeyFile, force = False):
+    """ Creates a key pair for a given product and stores it locally.  
+    If it already exists 'force' option can be used to recreate it.
     """
-    awsenv = appliance.resources[resname].providers.aws
-    key_pair = create_key_pair(awsenv.key_name, awsenv.key_file, False)
-    ensure_security_groups(resname, appliance)
-    instance = ec2r.create_instances(
-                ImageId = awsenv.ami,
-                InstanceType = awsenv.instance_type,
-                MinCount = 1, MaxCount = 1,
-                KeyName = awsenv.key_name,
-                DryRun = dry_run,
-                SecurityGroups = [awsenv.security_group.name],
-                TagSpecifications = [
-                    {
-                        'ResourceType': 'instance', 
-                        'Tags': [
-                            { 'Key': 'Product', 'Value': appliance.name },
-                            { 'Key': 'Version', 'Value': appliance.version },
-                        ]
-                    }
-                ])
-    return instance
 
-def bootstram_resource(resname, appliance, instance):
+    # Ensure parent folder exists since we are writing to it
+    KeyFilePath = fullpath(KeyFile)
+    ensure_pdir(KeyFilePath)
+
+    keypairs = ec2.describe_key_pairs()['KeyPairs']
+    if keypairs and any(d.get('KeyName', None) == KeyName for d in keypairs):
+        # If it already exists then ensure key file path exists
+        delkeypair = force
+        if not os.path.isfile(KeyFilePath):
+            if not force:
+                assert False, "Key pair already exists but key file path is missing.  Use force = True"
+        elif not force:
+            # Already exists, do nothing and leave
+            return 
+        if delkeypair:
+            if os.path.isfile(KeyFilePath):
+                os.chmod(KeyFilePath, 0o777)
+                os.remove(KeyFilePath)
+            ec2.delete_key_pair(KeyName = KeyName, DryRun = False)
+
+    # create key pair and output file
+    key_pair = ec2.create_key_pair(KeyName=KeyName)
+    KeyFile = open(KeyFilePath, "w")
+
+    KeyPairOut = str(key_pair['KeyMaterial'])
+    print(KeyPairOut)
+    KeyFile.write(KeyPairOut)
+    os.chmod(KeyFilePath, 0o400)
+    return KeyPairOut
+
+def ensure_security_groups(security_groups)
+    """ Ensures that security groups with particular permissions exist. """
+    curr_sec_groups = ec2.describe_security_groups()
+    for newsg in security_groups:
+        newsg = ensure_object(newsg)
+        for sg in curr_sec_groups['SecurityGroups']:
+            if sg['GroupName'] == newsg.GroupName:
+                break
+        else:
+            sg = ec2.create_security_group(
+                        GroupName = newsg.GroupName,
+                        Description = newsg.Description)
+            ec2.authorize_security_group_ingress(
+                     GroupId = sg['GroupId'], 
+                     IpPermissions = newsg.IpPermissions())
+
+commands = {
+    'create_key_pair': create_key_pair,
+    'ensure_security_groups': ensure_security_groups,
+    'create_instances': ec2r.create_instances
+    'create_db_instance': rds.create_db_instance
+}
+
+def bootstrap_resource(resname, appliance, instance):
     """ Given a clean-slate instance, bootstraps the product by installing it and all its dependencies
     so this instance can be snapshotted into an AMI.
     """
@@ -73,94 +108,3 @@ def bootstram_resource(resname, appliance, instance):
         conn = Connection("%s@%s" % (awsenv.ssh_user, instance.PublicDnsName))
         runner(resname, appliance, conn)
         return conn
-
-#####  Product Deployer API
-def launch_product(product):
-    """ Launches the product by bringing up the required instances as described by the product's manifest. """
-    pass
-
-def ssh(instanceid):
-    pass
-
-def create_key_pair(key_name, key_file, force = False):
-    """ Creates a key pair for a given product and stores it locally.  
-    If it already exists 'force' option can be used to recreate it.
-    """
-
-    # Ensure parent folder exists since we are writing to it
-    key_file_path = fullpath(key_file)
-    ensure_pdir(key_file_path)
-
-    keypairs = ec2.describe_key_pairs()['KeyPairs']
-    if keypairs and any(d.get('KeyName', None) == key_name for d in keypairs):
-        # If it already exists then ensure key file path exists
-        delkeypair = force
-        if not os.path.isfile(key_file_path):
-            if not force:
-                assert False, "Key pair already exists but key file path is missing.  Use force = True"
-        elif not force:
-            # Already exists, do nothing and leave
-            return 
-        if delkeypair:
-            if os.path.isfile(key_file_path):
-                os.chmod(key_file_path, 0o777)
-                os.remove(key_file_path)
-            ec2.delete_key_pair(KeyName = key_name, DryRun = False)
-
-    # create key pair and output file
-    key_pair = ec2.create_key_pair(KeyName=key_name)
-    key_file = open(key_file_path, "w")
-
-    KeyPairOut = str(key_pair['KeyMaterial'])
-    print(KeyPairOut)
-    key_file.write(KeyPairOut)
-    os.chmod(key_file_path, 0o400)
-    return KeyPairOut
-
-def ensure_security_groups(resname, appliance):
-    awsenv = appliance.resources[resname].providers.aws
-    sgs = ec2.describe_security_groups()
-    for sg in sgs['SecurityGroups']:
-        if sg['GroupName'] == awsenv.security_group.name:
-            return sg
-    sg = ec2.create_security_group(
-                GroupName = awsenv.security_group.name,
-                Description = "Default security group for launching VMs.")
-
-    ec2.authorize_security_group_ingress(
-             GroupId = sg['GroupId'], 
-             IpPermissions = [
-                 {
-                    'FromPort': 22, 'IpProtocol': 'tcp',
-                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
-                    'Ipv6Ranges': [],
-                    'PrefixListIds': [],
-                    'ToPort': 22,
-                    'UserIdGroupPairs': []
-                },
-                {
-                    'FromPort': 80, 'IpProtocol': 'tcp',
-                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
-                    'Ipv6Ranges': [],
-                    'PrefixListIds': [],
-                    'ToPort': 80,
-                    'UserIdGroupPairs': []
-                },
-                {
-                    'FromPort': 443, 'IpProtocol': 'tcp',
-                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
-                    'Ipv6Ranges': [],
-                    'PrefixListIds': [],
-                    'ToPort': 443,
-                    'UserIdGroupPairs': []
-                },
-                {
-                    'FromPort': 0, 'IpProtocol': 'icmp',
-                    'IpRanges': [{'CidrIp': '0.0.0.0/0'}],
-                    'Ipv6Ranges': [],
-                    'PrefixListIds': [],
-                    'ToPort': 0,
-                    'UserIdGroupPairs': []
-                }
-            ])
-

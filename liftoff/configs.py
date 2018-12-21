@@ -1,4 +1,5 @@
 
+import yaml
 from ipdb import set_trace
 from pprint import pprint
 from liftoff import utils
@@ -25,10 +26,14 @@ class Resource(object):
 def load(path):
     """ Loads the package and environment configs of a package at a given path. """
     contents = open(path).read()
-    pkgcode = compile(contents, path, "exec")
-    pkgdata = {}
-    exec(pkgcode, pkgdata)
-    del pkgdata['__builtins__']
+    if path.endswith(".yaml"):
+        pkgdata = yaml.load(contents)
+    else:
+        pkgcode = compile(contents, path, "exec")
+        pkgdata = {}
+        exec(pkgcode, pkgdata)
+        del pkgdata['__builtins__']
+    set_trace()
     appliance = Appliance(**(pkgdata['appliance']))
     appliance.config_path = path
     return appliance

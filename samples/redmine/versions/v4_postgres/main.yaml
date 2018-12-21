@@ -1,0 +1,86 @@
+
+# Config files describe a few things:
+#   -   Info about the package being installed.
+#   -   Info about the environment being installed into.
+#   -   Some things being "overrideable"
+#   -   How to snapshot an installed version so it can be brought up next time easily instead of a full bootstrap
+
+appliance:
+  name: redmine
+  version: 4.0
+  resources:
+    - name: "db"
+      providers:
+        aws: 
+          - cmd: create_db_instance
+            kwargs:
+              DBName: redmine
+              DBInstanceIdentifier: redmine1
+              Engine: postgres
+              StorageType: gp2
+              DBInstanceClass: "db.t2.micro"
+              # TODO - Get these to a principal store
+              MasterUsername: redmine
+              MasterUserPassword: redminepassword
+              AllocatedStorage: 20
+              SecurityGroups:
+                - GroupName: db_security_group
+                  Description: "Security group for DB instances."
+    - name: web
+      providers:
+        aws:
+          - cmd: create_key_pair
+            kwargs:
+              KeyName: redmine-ec2-keypair",
+              # Where we will look for or write a new key pair to for an instance being created
+              KeyFile: "~/.liftoff/keyfiles/redmine/redmine-ec2-keypair.pem"
+          - cmd: ensure_security_groups
+            kwargs:
+              SecurityGroups: 
+                - GroupName: "vm_launcher_group"
+                  Description: "Default security group for launching VMs."
+                  IpPermissions:
+                    - FromPort: 22
+                      IpProtocol: tcp
+                      IpRanges: [{CidrIp: 0.0.0.0/0}]
+                      Ipv6Ranges: []
+                      PrefixListIds: []
+                      ToPort: 22
+                      UserIdGroupPairs: []
+                    - FromPort: 80
+                      IpProtocol: tcp
+                      IpRanges: [{CidrIp: 0.0.0.0/0}]
+                      Ipv6Ranges: []
+                      PrefixListIds: []
+                      ToPort: 80
+                      UserIdGroupPairs: []
+                    - FromPort: 443
+                      IpProtocol: tcp
+                      IpRanges: [{CidrIp: 0.0.0.0/0}]
+                      Ipv6Ranges: []
+                      PrefixListIds: []
+                      ToPort: 443
+                      UserIdGroupPairs: []
+                    - FromPort: 0
+                      IpProtocol: icmp
+                      IpRanges: [{CidrIp: 0.0.0.0/0}]
+                      Ipv6Ranges: []
+                      PrefixListIds: []
+                      ToPort: 0
+                      UserIdGroupPairs: []
+          - cmd: create_instance
+            kwargs:
+              KeyName: redmine-ec2-keypair",
+              ImageId: "ami-0bbe6b35405ecebdb"  # Ubuntu 18.04 LTS
+              InstanceType: t1.micro
+              MinCount: 1
+              MaxCount: 1
+              SecurityGroups: ["vm_launcher_group"]
+              TagSpecifications:
+                  - ResourceType: instance
+                    Tags:
+                        - Key: Product
+                          Value: redmine
+                        - Key: Version
+                          Value: 4.0
+      bootstrap: "./bootstrap.py"

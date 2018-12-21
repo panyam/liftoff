@@ -9,7 +9,7 @@ def run(resname, appliance, conn):
     setup_nginx(resname, appliance, conn)
 
 def setup_ansible(resnam, appliance, conn):
-    conn.sudo("apt update")
+    conn.sudo("apt-get update")
     conn.sudo("apt-get --yes install software-properties-common")
     conn.sudo("apt-add-repository --yes --update ppa:ansible/ansible")
     conn.sudo("apt-get --yes install ansible")

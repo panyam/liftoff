@@ -3,6 +3,26 @@ import os
 import functools
 import contextlib
 
+def pathget(obj, pathspec, default = None, delim = "/"):
+    """ Given a list or a dict, returns a nested entry identified by a pathspec.
+    Path spec can be a "." limited string or a list of strings where each component is:
+        a. an integer denoting an index into the immediate parent
+        b. a string denoting a key into the immediate parent
+    """
+    if type(pathspec) is string:
+        pathspec = pathspec.split(delim)
+    pathspec = [p for p in pathspec if p.strip()]
+    curr = obj
+    for p in pathspec:
+        try:
+            p = int(p)
+        except:
+            pass
+        if p not in curr:
+            return default
+        curr = curr[p]
+    return p
+
 def preserve_cwd(function):
     @functools.wraps(function)
     def decorator(*args, **kwargs):
@@ -65,7 +85,10 @@ class Object(object):
         return len(self._values)
 
     def __iter__(self):
-        return ensure_object(iter(self._values))
+        return iter(map(ensure_object, self._values))
+
+    def __call__(self, *args, **kwargs):
+        return self._values
 
     def get(self, key_or_index, *args):
         if type(self._values) is list:
