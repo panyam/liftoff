@@ -1,4 +1,5 @@
 boto3
+boto
 ipython 
 ipdb
 pytest

@@ -1,12 +1,20 @@
 from ipdb import set_trace
 from liftoff.utils import remember_cwd
+from fabric import Connection
 import os
 
-def run(resname, appliance, conn):
+def create_connection(credentials):
+    ssh_user = credentials["ssh_user"]
+    hostname = credentials["hostname"]
+    # Connect to the instance
+    return Connection("%s@%s" % (ssh_user, hostname))
+
+def run(resname, appliance, credentials):
     """ Bootstraps this instance for a given application. """
-    # setup_ansible(conn)
-    # upload_setup_files(resname, appliance, conn)
-    setup_nginx(resname, appliance, conn)
+    conn = create_connection(credentials)
+    setup_ansible(conn)
+    upload_setup_files(conn)
+    setup_nginx(conn)
 
 def setup_ansible(resnam, appliance, conn):
     conn.sudo("apt-get update")
@@ -14,7 +22,7 @@ def setup_ansible(resnam, appliance, conn):
     conn.sudo("apt-add-repository --yes --update ppa:ansible/ansible")
     conn.sudo("apt-get --yes install ansible")
 
-def upload_setup_files(resname, appliance, conn):
+def upload_setup_files(conn):
     conn.run("rm -Rf files")
     conn.run("mkdir -p files")
     with remember_cwd():
@@ -30,6 +38,6 @@ def upload_setup_files(resname, appliance, conn):
                 conn.run("cd files && tar -zxvf %s" % tarball)
                 conn.run("rm files/%s" % tarball)
 
-def setup_nginx(resname, appliance, conn):
+def setup_nginx(conn):
     conn.run("ansible-galaxy install nginxinc.nginx")
     conn.run("ansible-playbook files/nginx/playbook.yml")

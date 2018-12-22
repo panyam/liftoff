@@ -1,4 +1,5 @@
 dist
+*.retry
 .cache
 gen
 .DS_Store

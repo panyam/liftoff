@@ -1,0 +1,29 @@
+
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+      - name: Create the VM launcher security group for creating instances
+        ec2_group:
+          name: "webserver_group"
+          description: "Default security group for launching VMs."
+          region: us-west-2
+          rules:
+            - from_port: 22
+              proto: tcp
+              cidr_ip: 0.0.0.0/0
+              to_port: 22
+            - from_port: 80
+              proto: tcp
+              cidr_ip: 0.0.0.0/0
+              to_port: 80
+            - from_port: 443
+              proto: tcp
+              cidr_ip: 0.0.0.0/0
+              to_port: 443
+            - from_port: 0
+              proto: icmp
+              cidr_ip: 0.0.0.0/0
+              to_port: 0
+        register: security_group
+
