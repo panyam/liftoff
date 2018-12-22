@@ -1,9 +1,0 @@
-# DB Settings required for Redmine
-production:
-  adapter: postgresql
-  database: {{ db.redmine.name }}
-  host: {{ db.redmine.host }}
-  username: {{ db.redmine.username }}
-  password: {{ db.redmine.password }}
-  encoding: utf8
-  schema_search_path: <database_schema> (default - public)
