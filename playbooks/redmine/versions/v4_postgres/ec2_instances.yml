@@ -2,16 +2,17 @@
 - hosts: localhost
   connection: local
   gather_facts: false
+  vars_files:
+    - vars.yml
   vars:
     product: redmine
     product_version: "4.0"
     region: us-west-2
-    keypair: redmine-ec2-keypair
     ami_image_id: "ami-0bbe6b35405ecebdb"  # Ubuntu 18.04 LTS
   tasks:
     - name: Setup EC2 Instances required for Redmine
       ec2:
-        keypair: "{{ keypair }}"
+        keypair: "{{ webservers.keypair }}"
         image: "{{ ami_image_id }}"
         region: "{{ region }}"
         instance_type: t1.micro
