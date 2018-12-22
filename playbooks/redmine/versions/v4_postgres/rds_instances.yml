@@ -1,4 +1,4 @@
-
+---
 - hosts: localhost
   connection: local
   gather_facts: false
@@ -14,4 +14,4 @@
           allocated_storage: 20
           username: redmine
           password: redminepassword
-
+        register: rds
