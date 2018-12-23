@@ -1,0 +1,11 @@
+---
+- hosts: webservers
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Setup Bundler Gem
+      gem:
+        name: bundler
+        state: present
+

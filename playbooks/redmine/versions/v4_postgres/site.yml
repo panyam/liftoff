@@ -4,4 +4,7 @@
 - import_playbook: security_groups.yml
 - import_playbook: rds_instances.yml
 - import_playbook: ec2_instances.yml
+- import_playbook: python.yml
+- import_playbook: ruby.yml
+- import_playbook: redmine.yml
 - import_playbook: nginx.yml

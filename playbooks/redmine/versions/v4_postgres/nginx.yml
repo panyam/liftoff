@@ -4,10 +4,6 @@
   vars_files:
     - vars.yml
   tasks:
-    - name: Ensure python exists
-      raw: test -e /usr/bin/python || (apt-get -y update && apt-get --yes install software-properties-common && apt-get install -y python2.7 python-pip)
-      become: yes
-
     - name: Ensure nginx is at the latest version
       apt: name=nginx state=latest
       become: yes

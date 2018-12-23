@@ -1,0 +1,55 @@
+---
+- hosts: webservers
+  gather_facts: False
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Ruby | Check if ruby install is present
+      shell: test -x /usr/local/bin/ruby-install
+      ignore_errors: yes
+      register: rubyinstall_present
+      tags: ruby
+
+    - name: Install Ruby dependancies
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - libffi-dev
+        - libgdbm-dev
+        - libncurses5-dev
+        - libreadline-dev
+        - libreadline6-dev
+        - libtinfo-dev
+        - libyaml-dev
+      become: yes
+      tags: ruby
+
+    - name: Ruby | Download rubyinstall
+      get_url: url=http://github.com/postmodern/ruby-install/archive/v{{ ruby_install_version }}.tar.gz
+             dest=/tmp/ruby-install-{{ ruby_install_version }}.tar.gz
+      when: rubyinstall_present is failed
+      tags: ruby
+
+    - name: Ruby | Unpack ruby-install
+      unarchive:
+          src: /tmp/ruby-install-{{ ruby_install_version }}.tar.gz
+          dest: /tmp
+      when: rubyinstall_present is failed
+      tags: ruby
+
+    - name: Ruby | Run ruby-install install target
+      command: make install
+             chdir=/tmp/ruby-install-{{ ruby_install_version }}
+      when: rubyinstall_present is failed
+      become: yes
+      tags: ruby
+
+    - name: Ruby | Download list of rubies available
+      command: ruby-install
+      when: rubyinstall_present is failed
+      become: yes
+      tags: ruby
+
