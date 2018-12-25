@@ -4,6 +4,14 @@
   vars_files:
     - vars.yml
   tasks:
-    - name: Ensure nginx is at the latest version
-      apt: name=ruby state=latest
+    - name: Install Ruby Dependancies
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - ruby
+        - ruby-bundler
       become: yes
+      tags: python

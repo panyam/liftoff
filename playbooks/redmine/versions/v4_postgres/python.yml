@@ -4,6 +4,15 @@
   vars_files:
     - vars.yml
   tasks:
-    - name: Ensure python exists
-      raw: test -e /usr/bin/python || (apt-get -y update && apt-get --yes install software-properties-common && apt-get install -y python2.7 python-pip)
+    - name: Install Python Dependancies
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - software-properties-common
+        - python2.7
+        - python-pip
       become: yes
+      tags: python
