@@ -5,7 +5,4 @@
     - vars.yml
   tasks:
     - name: Setup Bundler Gem
-      gem:
-        name: bundler
-        state: present
 
