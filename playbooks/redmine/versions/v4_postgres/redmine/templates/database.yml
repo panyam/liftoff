@@ -1,7 +1,7 @@
 production:
   adapter: postgresql
   database: "{{database.name}}"
-  host: "{{ rds.public_ip }}"
+  host: "{{ hostvars.localhost.rds.endpoint.address }}"
   username: "{{ database.username }}"
   password: "{{ database.password }}"
   encoding: utf8

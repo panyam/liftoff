@@ -22,6 +22,19 @@
     remote_src: yes
   when: redmine_src_folder_stat_result.stat.exists == False
 
+- name: "RDS Vars: "
+  debug: var=hostvars.localhost.rds
+
+- name: "WebServer Vars: "
+  debug: var=webservers
+
+- name: Uploading database.yml
+  template:
+    src: ./redmine/templates/database.yml
+    dest: "/home/{{webservers.ssh_user}}/redmine-4.0.0.tar.gz"
+    owner: "{{webservers.ssh_user}}"
+    mode: "u=rw,g=r,o=r"
+
 - name: Setup gems for Redmine
   bundler:
     state: present

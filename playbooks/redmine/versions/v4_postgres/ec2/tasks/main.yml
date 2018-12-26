@@ -52,3 +52,8 @@
     tags:
       Name: webserver
   delegate_to: localhost
+
+- name: Bootstrap a host without python2 installed
+  raw: "fab -H {{webservers.ssh_user}}@{{item.public_ip}} bootstrap"
+  with_items: "{{ ec2.tagged_instances }}"
+  delegate_to: localhost
