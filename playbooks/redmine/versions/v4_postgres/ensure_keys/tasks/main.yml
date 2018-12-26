@@ -1,0 +1,13 @@
+- name: Debug Print Groups
+  debug: var=webservers
+
+- name: Check if private key file exists
+  stat:
+    path: "{{ webservers.private_keyfile }}"
+  register: webserver_private_keyfile
+
+- name: Delete the keypair on remote if it does not exist locally.
+  ec2_key:
+    name: "{{ webservers.keypair }}"
+    state: absent
+  when: webserver_private_keyfile.stat.exists == False

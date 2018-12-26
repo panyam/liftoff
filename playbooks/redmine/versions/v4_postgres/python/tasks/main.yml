@@ -1,0 +1,12 @@
+- name: Install Python Dependancies
+  apt:
+    name: "{{ packages }}"
+    state: present
+    update_cache: yes
+  vars:
+    packages:
+    - build-essential
+    - python2.7
+    - python-pip
+  become: yes
+  tags: python

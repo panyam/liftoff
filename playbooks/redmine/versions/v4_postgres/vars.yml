@@ -1,15 +1,21 @@
+product: redmine
+product_version: "4.0"
+
+region: us-west-2
+rubies_location: "/home/{{webservers.ssh_user}}/.ruby"
+ruby_version: 2.5.3
+ruby_install_version: 0.7.0
+
 webservers:
     keypair: redmine-ec2-keypair
     private_keyfile: "~/.liftoff/keyfiles/redmine/redmine-ec2-keypair.pem"
     ssh_user: ubuntu
+    ami_image_id: "ami-0bbe6b35405ecebdb"  # Ubuntu 18.04 LTS
 
 database:
     name: redmine1
     username: redmine
     password: redminepassword
 
-rubies_location: "/home/{{webservers.ssh_user}}/.ruby"
-ruby_version: 2.5.3
-ruby_install_version: 0.7.0
 ansible_ssh_private_key_file: "{{ webservers.private_keyfile }}"
 ansible_user: "{{ webservers.ssh_user }}"

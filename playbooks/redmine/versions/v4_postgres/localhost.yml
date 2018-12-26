@@ -1,0 +1,11 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: False
+  vars_files:
+    - vars.yml
+  roles:
+    - ensure_keys
+    - security_groups
+    - rds
+    - ec2
