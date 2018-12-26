@@ -11,7 +11,7 @@
         update_cache: yes
       vars:
         packages:
-        - software-properties-common
+        - build-essential
         - python2.7
         - python-pip
       become: yes

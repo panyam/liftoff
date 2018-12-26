@@ -1,0 +1,14 @@
+---
+- name: Upgrade common packages
+  apt: upgrade=safe
+  
+- name: Install core packages
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items:
+  - python2.7
+  - ruby
+  - ruby-bundler
+  - ufw

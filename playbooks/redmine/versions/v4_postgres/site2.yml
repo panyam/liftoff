@@ -1,0 +1,6 @@
+---
+- import_playbook: ensure_keys.yml
+- import_playbook: security_groups.yml
+- import_playbook: rds_instances.yml
+- import_playbook: ec2_instances.yml
+- import_playbook: provision.yml

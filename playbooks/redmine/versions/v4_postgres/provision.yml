@@ -1,0 +1,11 @@
+---
+- name: Provisioning webserver hosts
+  hosts: webservers
+  vars_files:
+    - vars.yml
+  roles:
+   - common
+   - python
+   - ruby
+   - nginx
+   - redmine
