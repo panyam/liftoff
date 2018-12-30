@@ -1,9 +1,4 @@
 ---
-  # - name: Install Ruby Apt Sources
-  # apt_repository:
-  # repo: ppa:isage-dna/imagick
-  # state: present
-  # become: yes
 - name: Install Ruby Dependancies
   apt:
     name: "{{ packages }}"

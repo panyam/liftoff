@@ -6,7 +6,7 @@
     region: "{{ region }}"
     instance_type: t1.micro
     exact_count: 1
-    group: webserver_group
+    group_id: [ "{{ rds.vpc_security_groups.0.vpc_security_group_id}}", "{{ webserver_security_group.group_id }}" ]
     wait: true
     count_tag: 
         Product: "{{ product }}"

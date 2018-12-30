@@ -8,6 +8,7 @@
     engine: postgres
     storage_type: gp2
     allocated_storage: 20
+    publicly_accessible: no
     username: "{{ database.username }}"
     password: "{{ database.password }}"
   register: rds

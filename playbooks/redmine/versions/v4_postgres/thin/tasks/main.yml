@@ -1,0 +1,58 @@
+---
+- name: Checking Redmine.yml thin config exists
+  stat:
+    path: /etc/thin2.5/redmine.yml
+  register: redmine_thin_configl_stat_result
+
+- name: Ensure Thin is at the latest version
+  apt: name=thin state=latest
+  become: yes
+
+- name: Creating directories for Thin
+  file:
+    path: "{{item}}"
+    state: directory
+  become: yes
+  with_items: [ "/var/run/redmine", "/var/run/redmine/sockets/", "/var/run/thin/", "/var/log/thin/" ]
+  when: redmine_thin_configl_stat_result.stat.result == False
+
+- name: Ensuring ownership of directories for thin
+  raw: "chown www-data:www-data /var/run/redmine/sockets/ /var/run/thin/"
+  become: yes
+  when: redmine_thin_configl_stat_result.stat.result == False
+
+- name: Copying LogRotate config for thin
+  template:
+    src: ./thin/templates/logrotate.thin
+    dest: "/etc/logrotate.d/thin"
+    mode: "u=rw,g=r,o=r"
+  become: yes
+  when: redmine_thin_configl_stat_result.stat.result == False
+
+- name: Setup init.d for Thin
+  blockinfile:
+      path: "/etc/init.d/thin"
+      block: |
+        pre-start script
+            mkdir -p -m0755 /var/run/redmine
+            mkdir -p -m0755 /var/run/redmine/sockets
+            mkdir -p -m0755 /var/run/thin
+            chown www-data:www-data /var/run/redmine/sockets
+            chown www-data:www-data /var/run/thin
+        end script
+      insertbefore: "DAEMON=/usr/bin/thin"
+      state: present
+      create: yes
+  become: yes
+  when: redmine_thin_configl_stat_result.stat.result == False
+
+- name: Start Thin Config
+  raw: "thin config --chdir /usr/share/redmine --config /etc/thin2.5/redmine.yml --environment production --socket /var/run/redmine/sockets/thin.sock --daemonize --log /var/log/thin/redmine.log --pid /var/run/thin/redmine.pid --user www-data --group www-data --servers 1 --prefix /redmine"
+  become: yes
+  when: redmine_thin_configl_stat_result.stat.result == False
+
+- name: Restart Thin
+  service:
+    name: thin
+    state: restarted
+  become: yes

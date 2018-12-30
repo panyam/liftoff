@@ -1,24 +1,44 @@
 ---
+- name: "Checking redmine-4.0.0 install_timestamp"
+  stat:
+    path: "{{webservers.redmine_home}}/install_timestamp"
+  register: redmine_install_timestamp_stat_result
+
+- name: "Ensuring Dependancy Packages exists"
+  apt:
+    name: [ "ruby-dev", "patch", "zlib1g-dev", "liblzma-dev", "libpq-dev", "libsqlite3-dev", "thin" ]
+    state: present
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+  become: yes
+
+# Lookup this one PATH issue: https://github.com/rvm/rvm1-ansible/issues/46
+- name: "Ensuring Dependancy Gems exists"
+  gem:
+    name: "{{item}}"
+    state: present
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+  with_items: [ "pg", "nokogiri"]
+
 - name: "Checking redmine-4.0.0 tarball exists"
   stat:
-    path: "/home/{{webservers.ssh_user}}/redmine-4.0.0.tar.gz"
+    path: "/home/{{webservers.redmine_user}}/redmine-4.0.0.tar.gz"
   register: redmine_tarball_stat_result
 
 - name: Checking redmine-4.0.0 folder exists
   stat:
-    path: "/home/{{webservers.ssh_user}}/redmine-4.0.0"
+    path: "{{webservers.redmine_home}}"
   register: redmine_src_folder_stat_result
 
 - name: Create the file, if it doesnt exist already
   get_url:
     url: "http://www.redmine.org/releases/redmine-4.0.0.tar.gz"
-    dest: "/home/{{webservers.ssh_user}}/redmine-4.0.0.tar.gz"
+    dest: "/home/{{webservers.redmine_user}}/redmine-4.0.0.tar.gz"
   when: redmine_src_folder_stat_result.stat.exists == False and redmine_tarball_stat_result.stat.exists == False 
 
 - name: Unarchiving redmine tarball
   unarchive:
-    src: "/home/{{webservers.ssh_user}}/redmine-4.0.0.tar.gz"
-    dest: "/home/{{webservers.ssh_user}}"
+    src: "/home/{{webservers.redmine_user}}/redmine-4.0.0.tar.gz"
+    dest: "{{webservers.redmine_home | dirname}}"
     remote_src: yes
   when: redmine_src_folder_stat_result.stat.exists == False
 
@@ -31,11 +51,51 @@
 - name: Uploading database.yml
   template:
     src: ./redmine/templates/database.yml
-    dest: "/home/{{webservers.ssh_user}}/redmine-4.0.0.tar.gz"
-    owner: "{{webservers.ssh_user}}"
+    dest: "{{webservers.redmine_home}}/config/database.yml"
+    owner: "{{webservers.redmine_user}}"
     mode: "u=rw,g=r,o=r"
+  become: yes
 
-- name: Setup gems for Redmine
+- name: Setup Redmine Gems Bundle
   bundler:
     state: present
-    gemfile: "/home/{{webservers.ssh_user}}/redmine-4.0.0/Gemfile"
+    chdir: "{{webservers.redmine_home}}"
+    extra_args: "--without development test rmagick"
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.gem/ruby/{{ ruby_version }}/bin:\
+           {{ lookup('env', 'PATH') }}"
+    GEM_PATH: "{{ ansible_env.HOME }}/.gem/ruby/{{ ruby_version }}"
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+
+- name: Generate Redmine Secret Token
+  raw: "cd {{webservers.redmine_home}} && bundle exec rake generate_secret_token"
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+
+- name: Setup/Migrate Redmine DB
+  raw: "cd {{webservers.redmine_home}} && RAILS_ENV=production bundle exec rake db:migrate"
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+
+- name: Load default Redmine DB Data
+  raw: "cd {{webservers.redmine_home}} && RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data"
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+
+- name: Setup Data Folders
+  raw: "cd {{webservers.redmine_home}}  && \
+        mkdir -p tmp tmp/pdf public/plugin_assets       && \
+        chmod -R 755 files log tmp public/plugin_assets"
+  when: redmine_install_timestamp_stat_result.stat.exists == False
+
+- name: Setup Folder Ownership
+  raw: "chown -R www-data:www-data {{webservers.redmine_home}}"
+  become: yes
+
+- name: Creating symlink to redmine in /usr/share
+  file:
+    src: "{{webservers.redmine_home}}"
+    dest: /usr/share/redmine
+    state: link
+  become: yes
+
+- name: Marking Installation Complete
+  raw: "date >> {{webservers.redmine_home}}/install_timestamp"
+  when: redmine_install_timestamp_stat_result.stat.exists == False

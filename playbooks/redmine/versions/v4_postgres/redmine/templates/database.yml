@@ -5,4 +5,8 @@ production:
   username: "{{ database.username }}"
   password: "{{ database.password }}"
   encoding: utf8
-  schema_search_path: <database_schema> (default - public)
+  schema_search_path: public
+
+development:
+  adapter: sqlite3
+  database: "db/redmine1.db"

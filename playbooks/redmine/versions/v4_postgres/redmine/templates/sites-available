@@ -1,0 +1,45 @@
+upstream redmine_thin_servers {
+  server unix:/var/run/redmine/sockets/thin.0.sock;
+  # Add additional copies if using multiple Thin servers
+  #server unix:/var/run/redmine/sockets/thin.1.sock;
+}
+
+server {
+  listen   80; ## listen for ipv4
+  listen   [::]:80 default ipv6only=on; ## listen for ipv6
+
+  # Set appropriately for virtual hosting and to use server_name_in_redirect
+  server_name  localhost;
+  server_name_in_redirect off;
+
+  access_log  /var/log/nginx/localhost.access.log;
+  error_log  /var/log/nginx/localhost.error.log;
+
+  # Note: Documentation says proxy_set_header should work in location
+  #       block, but testing did not support this statement so it has
+  #       been placed here in server block
+  include /etc/nginx/proxy_params;
+  proxy_redirect off;
+  # Note:  Must match the prefix used in Thin configuration for Redmine
+  #        or / if no prefix configured
+  location /redmine {
+    root   /usr/share/redmine/public;
+
+    error_page 404  404.html;
+    error_page 500 502 503 504  500.html;
+
+    # Uncomment below lines if using HTTPS
+    # Note1:  Change $host to SSL CN if multiple host names used
+    # Note2:  Adjust prefix, if different in Thin Redmine config
+#rewrite ^/redmine/login(.*) https://$host$request_uri permanent;
+    #rewrite ^/redmine/my/account(.*) https://$host$request_uri permanent;
+    #rewrite ^/redmine/my/password(.*) https://$host$request_uri permanent;
+    #rewrite ^/redmine/admin(.*) https://$host$request_uri permanent;
+
+    try_files $uri/index.html $uri.html $uri @redmine_thin_servers;
+  }
+
+  location @redmine_thin_servers {
+    proxy_pass http://redmine_thin_servers;
+  }
+}

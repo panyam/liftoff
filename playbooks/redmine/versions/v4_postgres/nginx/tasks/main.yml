@@ -2,23 +2,28 @@
 - name: Ensure nginx is at the latest version
   apt: name=nginx state=latest
   become: yes
+
 - name: start nginx
   service:
       name: nginx
       state: started
   become: yes
-- name: Copy the nginx config file and restart nginx
-  copy:
-    src: ./static_site.cfg
-    dest: /etc/nginx/sites-available/static_site.cfg
+
+- name: Uploading redmine config to sites-available
+  template:
+    src: ./redmine/templates/sites-available
+    dest: "/etc/nginx/sites-available/redmine"
+    mode: "u=rw,g=r,o=r"
   become: yes
-- name: create symlink
+
+- name: Creating symlink to redmine
   file:
-    src: /etc/nginx/sites-available/static_site.cfg
+    src: /etc/nginx/sites-available/redmine
     dest: /etc/nginx/sites-enabled/default
     state: link
   become: yes
-- name: restart nginx
+
+- name: Restart Nginx
   service:
     name: nginx
     state: restarted

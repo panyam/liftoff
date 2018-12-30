@@ -20,5 +20,7 @@
         proto: icmp
         cidr_ip: 0.0.0.0/0
         to_port: 0
-  register: security_group
+  register: webserver_security_group
 
+- name: "WebServer SecurityGroup Details:"
+  debug: var=webserver_security_group
