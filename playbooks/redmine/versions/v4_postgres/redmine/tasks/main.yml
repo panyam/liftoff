@@ -3,6 +3,7 @@
   stat:
     path: "{{webservers.redmine_home}}/install_timestamp"
   register: redmine_install_timestamp_stat_result
+  tags: redmine
 
 - name: "Ensuring Dependancy Packages exists"
   apt:
@@ -10,6 +11,7 @@
     state: present
   when: redmine_install_timestamp_stat_result.stat.exists == False
   become: yes
+  tags: redmine
 
 # Lookup this one PATH issue: https://github.com/rvm/rvm1-ansible/issues/46
 - name: "Ensuring Dependancy Gems exists"
@@ -18,22 +20,26 @@
     state: present
   when: redmine_install_timestamp_stat_result.stat.exists == False
   with_items: [ "pg", "nokogiri"]
+  tags: redmine
 
 - name: "Checking redmine-4.0.0 tarball exists"
   stat:
     path: "/home/{{webservers.redmine_user}}/redmine-4.0.0.tar.gz"
   register: redmine_tarball_stat_result
+  tags: redmine
 
 - name: Checking redmine-4.0.0 folder exists
   stat:
     path: "{{webservers.redmine_home}}"
   register: redmine_src_folder_stat_result
+  tags: redmine
 
 - name: Create the file, if it doesnt exist already
   get_url:
     url: "http://www.redmine.org/releases/redmine-4.0.0.tar.gz"
     dest: "/home/{{webservers.redmine_user}}/redmine-4.0.0.tar.gz"
   when: redmine_src_folder_stat_result.stat.exists == False and redmine_tarball_stat_result.stat.exists == False 
+  tags: redmine
 
 - name: Unarchiving redmine tarball
   unarchive:
@@ -41,12 +47,7 @@
     dest: "{{webservers.redmine_home | dirname}}"
     remote_src: yes
   when: redmine_src_folder_stat_result.stat.exists == False
-
-- name: "RDS Vars: "
-  debug: var=hostvars.localhost.rds
-
-- name: "WebServer Vars: "
-  debug: var=webservers
+  tags: redmine
 
 - name: Uploading database.yml
   template:
@@ -55,6 +56,7 @@
     owner: "{{webservers.redmine_user}}"
     mode: "u=rw,g=r,o=r"
   become: yes
+  tags: redmine
 
 - name: Setup Redmine Gems Bundle
   bundler:
@@ -66,28 +68,39 @@
            {{ lookup('env', 'PATH') }}"
     GEM_PATH: "{{ ansible_env.HOME }}/.gem/ruby/{{ ruby_version }}"
   when: redmine_install_timestamp_stat_result.stat.exists == False
+  tags: redmine
+  become: yes
 
 - name: Generate Redmine Secret Token
   raw: "cd {{webservers.redmine_home}} && bundle exec rake generate_secret_token"
   when: redmine_install_timestamp_stat_result.stat.exists == False
+  tags: redmine
+  become: yes
 
 - name: Setup/Migrate Redmine DB
   raw: "cd {{webservers.redmine_home}} && RAILS_ENV=production bundle exec rake db:migrate"
   when: redmine_install_timestamp_stat_result.stat.exists == False
+  tags: redmine
+  become: yes
 
 - name: Load default Redmine DB Data
   raw: "cd {{webservers.redmine_home}} && RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data"
   when: redmine_install_timestamp_stat_result.stat.exists == False
+  tags: redmine
+  become: yes
 
 - name: Setup Data Folders
   raw: "cd {{webservers.redmine_home}}  && \
         mkdir -p tmp tmp/pdf public/plugin_assets       && \
         chmod -R 755 files log tmp public/plugin_assets"
   when: redmine_install_timestamp_stat_result.stat.exists == False
+  become: yes
+  tags: redmine
 
 - name: Setup Folder Ownership
   raw: "chown -R www-data:www-data {{webservers.redmine_home}}"
   become: yes
+  tags: redmine
 
 - name: Creating symlink to redmine in /usr/share
   file:
@@ -95,7 +108,10 @@
     dest: /usr/share/redmine
     state: link
   become: yes
+  tags: redmine
 
 - name: Marking Installation Complete
   raw: "date >> {{webservers.redmine_home}}/install_timestamp"
   when: redmine_install_timestamp_stat_result.stat.exists == False
+  become: yes
+  tags: redmine

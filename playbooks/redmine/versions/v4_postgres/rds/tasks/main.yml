@@ -12,3 +12,8 @@
     username: "{{ database.username }}"
     password: "{{ database.password }}"
   register: rds
+  tags: rds
+
+- name: "RDS Instances:"
+  debug: var=rds
+  tags: rds

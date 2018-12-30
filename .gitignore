@@ -1,5 +1,6 @@
 dist
 *.retry
+*.pem
 .cache
 gen
 .DS_Store

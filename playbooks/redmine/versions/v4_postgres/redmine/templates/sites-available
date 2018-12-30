@@ -9,7 +9,18 @@ server {
   listen   [::]:80 default ipv6only=on; ## listen for ipv6
 
   # Set appropriately for virtual hosting and to use server_name_in_redirect
-  server_name  localhost;
+  server_name  localhost {{server_hostname}} www.{{server_hostname}};
+  return 302 https://$server_name$request_uri;
+}
+
+server {
+  listen   443 ssl; ## listen for ipv4
+  listen   [::]:443 ssl;
+  include snippets/self-signed.conf;
+  include snippets/ssl-params.conf;
+
+  # Set appropriately for virtual hosting and to use server_name_in_redirect
+  server_name  localhost {{server_hostname}} www.{{server_hostname}};
   server_name_in_redirect off;
 
   access_log  /var/log/nginx/localhost.access.log;

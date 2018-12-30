@@ -2,12 +2,7 @@
 - name: Ensure nginx is at the latest version
   apt: name=nginx state=latest
   become: yes
-
-- name: start nginx
-  service:
-      name: nginx
-      state: started
-  become: yes
+  tags: nginx
 
 - name: Uploading redmine config to sites-available
   template:
@@ -15,6 +10,31 @@
     dest: "/etc/nginx/sites-available/redmine"
     mode: "u=rw,g=r,o=r"
   become: yes
+  tags: nginx
+
+- name: Uploading self signed certs
+  template:
+    src: ./nginx/templates/self-signed.conf
+    dest: "/etc/nginx/snippets/self-signed.conf"
+    mode: "u=rw,g=r,o=r"
+  become: yes
+  tags: nginx
+
+- name: Uploading dhparam.pem
+  template:
+    src: ./dhparam.pem
+    dest: "/etc/nginx/dhparam.pem"
+    mode: "u=rw,g=r,o=r"
+  become: yes
+  tags: nginx
+
+- name: Uploading ssl-params.conf
+  template:
+    src: ./nginx/templates/ssl-params.conf
+    dest: "/etc/nginx/snippets/ssl-params.conf"
+    mode: "u=rw,g=r,o=r"
+  become: yes
+  tags: nginx
 
 - name: Creating symlink to redmine
   file:
@@ -22,9 +42,11 @@
     dest: /etc/nginx/sites-enabled/default
     state: link
   become: yes
+  tags: nginx
 
 - name: Restart Nginx
   service:
     name: nginx
     state: restarted
   become: yes
+  tags: nginx

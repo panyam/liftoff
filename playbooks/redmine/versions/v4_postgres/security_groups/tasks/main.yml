@@ -21,6 +21,8 @@
         cidr_ip: 0.0.0.0/0
         to_port: 0
   register: webserver_security_group
+  tags: secgroups
 
 - name: "WebServer SecurityGroup Details:"
   debug: var=webserver_security_group
+  tags: secgroups

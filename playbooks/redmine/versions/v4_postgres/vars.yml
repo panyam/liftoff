@@ -1,6 +1,8 @@
 product: redmine
 product_version: "4.0"
 
+server_hostname: panyamfamily.com
+
 region: us-west-2
 rubies_location: "/home/{{webservers.ssh_user}}/.ruby"
 ruby_version: 2.5.0

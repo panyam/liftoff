@@ -1,0 +1,50 @@
+---
+- name: Ensure python OpenSSL dependencies are installed.
+  pip:
+    name: pyOpenSSL
+    state: present
+  tags: certs
+  become: yes
+
+- name: Checking for existance of Diffie Helman Params file
+  stat:
+    path: "./dhparam.pem"
+  register: dhparam_stat_result
+  delegate_to: localhost
+  tags: certs
+
+- name: Ensure Diffie Helman Params file exists
+  raw: openssl dhparam -dsaparam -out ./dhparam.pem 4096
+  when: dhparam_stat_result.stat.exists == False
+  delegate_to: localhost
+  tags: certs
+
+- name: Ensure directory exists for local self-signed TLS certs.
+  file:
+    path: /etc/letsencrypt/live/{{ server_hostname }}
+    state: directory
+  tags: certs
+  become: yes
+
+- name: Generate an OpenSSL private key.
+  openssl_privatekey:
+    path: /etc/letsencrypt/live/{{ server_hostname }}/privkey.pem
+  tags: certs
+  become: yes
+
+- name: Generate an OpenSSL CSR.
+  openssl_csr:
+    path: /etc/ssl/private/{{ server_hostname }}.csr
+    privatekey_path: /etc/letsencrypt/live/{{ server_hostname }}/privkey.pem
+    common_name: "{{ server_hostname }}"
+  tags: certs
+  become: yes
+
+- name: Generate a Self Signed OpenSSL certificate.
+  openssl_certificate:
+    path: /etc/letsencrypt/live/{{ server_hostname }}/fullchain.pem
+    privatekey_path: /etc/letsencrypt/live/{{ server_hostname }}/privkey.pem
+    csr_path: /etc/ssl/private/{{ server_hostname }}.csr
+    provider: selfsigned
+  tags: certs
+  become: yes

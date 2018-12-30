@@ -7,4 +7,5 @@
     - ruby
     - redmine
     - thin
+    - certs
     - nginx
