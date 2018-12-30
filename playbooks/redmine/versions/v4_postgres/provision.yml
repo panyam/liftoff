@@ -6,4 +6,5 @@
   roles:
     - ruby
     - redmine
+    - thin
     - nginx
