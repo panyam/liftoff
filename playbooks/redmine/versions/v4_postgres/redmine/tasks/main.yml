@@ -28,6 +28,11 @@
   register: redmine_tarball_stat_result
   tags: redmine
 
+- name: "Updating Gems"
+  raw: "cd {{webservers.redmine_home}} && gem update --no-ri --no-rdoc"
+  tags: redmine
+  become: yes
+
 - name: Checking redmine-4.0.0 folder exists
   stat:
     path: "{{webservers.redmine_home}}"
@@ -55,6 +60,17 @@
     dest: "{{webservers.redmine_home}}/config/database.yml"
     owner: "{{webservers.redmine_user}}"
     mode: "u=rw,g=r,o=r"
+  become: yes
+  tags: redmine
+
+- name: Set redmine relative URL
+  lineinfile:
+      dest: "{{webservers.redmine_home}}/config/routes.rb"
+      regexp: Redmine::Utils::relative_url_root = "/redmine"
+      line: Redmine::Utils::relative_url_root = "/redmine"
+      insertbefore: "Rails.application.routes.draw do" 
+      state: present
+      create: yes
   become: yes
   tags: redmine
 
